@@ -1,0 +1,42 @@
+name: Export Android APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Unzip project (finds any .zip in the repo root)
+        run: |
+          apt-get update -y && apt-get install -y unzip
+          ZIPFILE=$(ls *.zip 2>/dev/null | head -n 1)
+          if [ -z "$ZIPFILE" ]; then
+            echo "No .zip file found in repo root!"
+            exit 1
+          fi
+          echo "Using archive: $ZIPFILE"
+          unzip -o "$ZIPFILE"
+
+      - name: Import project assets
+        working-directory: prank_app
+        run: godot --headless --verbose --editor --quit
+        continue-on-error: true
+
+      - name: Export Android APK
+        working-directory: prank_app
+        run: |
+          mkdir -p ../build/android
+          godot --headless --verbose --export-debug "Android" "$(readlink -f ../build/android)/PrankApp-debug.apk"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrankApp-debug-apk
+          path: build/android
